@@ -4,13 +4,15 @@
  */
 
 import { useState, useMemo } from 'react';
-import { tollingData, generateTimeline, CountryData, TollingTechnology } from './data/tollData';
+import { tollingFacts, countriesData, TollingFact, TollingTechnology } from './data/tollData';
 import { WorldMap } from './components/WorldMap';
 import { KpiGauges } from './components/KpiGauges';
 import { BarChart } from './components/BarChart';
 import { DataTable } from './components/DataTable';
-import { BubbleChart } from './components/BubbleChart';
 import { TimelineChart } from './components/TimelineChart';
+import { Heatmap } from './components/Heatmap';
+import { ScatterChart } from './components/ScatterChart';
+import { SankeyChart } from './components/SankeyChart';
 import { 
   Filter, 
   Search,
@@ -23,7 +25,9 @@ import {
   AlertCircle,
   Cpu,
   Moon,
-  Sun
+  Sun,
+  Brain,
+  Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -33,65 +37,106 @@ function DashboardContent() {
   const { isDarkMode, toggleTheme } = useTheme();
   const [selectedRegion, setSelectedRegion] = useState<string>('Tous');
   const [selectedTech, setSelectedTech] = useState<string>('Toutes');
-  const [selectedCountry, setSelectedCountry] = useState<CountryData | null>(null);
+  const [selectedLLM, setSelectedLLM] = useState<string>('Tous');
+  const [selectedDate, setSelectedDate] = useState<string>('Toutes');
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  const regions = ['Tous', ...Array.from(new Set(tollingData.map(d => d.region)))];
+  const regions = ['Tous', ...Array.from(new Set(countriesData.map(d => d.region)))];
   const technologies = [
     'Toutes',
     'ANPR/LPR',
     'RFID/E-TAG',
     'GNSS',
-    'DSRC',
-    'ETC',
-    'FASTag'
+    'RFID',
+    'E-TAG',
+    'GNSS/ANPR',
+    'RFID/ANPR',
   ];
+  const dates = ['Toutes', ...Array.from(new Set(tollingFacts.map(f => f.date)))].sort();
 
   const filteredData = useMemo(() => {
-    return tollingData.filter(d => {
-      const regionMatch = selectedRegion === 'Tous' || d.region === selectedRegion;
-      const techMatch = selectedTech === 'Toutes' || d.tech.includes(selectedTech as TollingTechnology);
-      return regionMatch && techMatch;
+    return tollingFacts.filter(f => {
+      const regionMatch = selectedRegion === 'Tous' || f.region === selectedRegion;
+      const techMatch = selectedTech === 'Toutes' || f.tech === selectedTech;
+      const llmMatch = selectedLLM === 'Tous' || f.llmStatus === selectedLLM;
+      const dateMatch = selectedDate === 'Toutes' || f.date === selectedDate;
+      const countryMatch = !selectedCountry || f.country === selectedCountry;
+      return regionMatch && techMatch && llmMatch && dateMatch && countryMatch;
     });
-  }, [selectedRegion, selectedTech]);
+  }, [selectedRegion, selectedTech, selectedLLM, selectedDate, selectedCountry]);
+
+  // For components that expect country summaries
+  const summaries = useMemo(() => {
+    return countriesData.map(c => {
+      const countryFacts = filteredData.filter(f => f.country === c.name);
+      if (countryFacts.length === 0) return null;
+      
+      const totalVehicles = countryFacts.reduce((acc, curr) => acc + curr.vehiclesDay, 0);
+      const totalReadings = countryFacts.reduce((acc, curr) => acc + curr.readingsOk, 0);
+      
+      return {
+        id: c.id,
+        name: c.name,
+        region: c.region,
+        automation: countryFacts.reduce((acc, curr) => acc + curr.automationRate, 0) / countryFacts.length,
+        precision: (totalReadings / totalVehicles) * 100,
+        fluidity: countryFacts.reduce((acc, curr) => acc + curr.avgTimeSec, 0) / countryFacts.length,
+        volume: totalVehicles / countryFacts.length, // Average daily for the period
+        revenue: countryFacts.reduce((acc, curr) => acc + curr.revenueUsd, 0) / countryFacts.length,
+        errors: countryFacts.reduce((acc, curr) => acc + curr.errorRate, 0) / countryFacts.length,
+        tech: [c.tech] as TollingTechnology[],
+        iaLevel: c.iaLevel,
+        electronicAdoption: c.adoption,
+        coordinates: c.coords as [number, number]
+      };
+    }).filter(Boolean);
+  }, [filteredData]);
 
   const globalKpis = useMemo(() => {
-    if (filteredData.length === 0) return { automation: 0, precision: 0, fluidity: 0 };
+    if (filteredData.length === 0) return { automation: 0, precision: 0, fluidity: 0, revenue: 0, errors: 0 };
+    const totalVehicles = filteredData.reduce((acc, curr) => acc + curr.vehiclesDay, 0);
+    const totalReadings = filteredData.reduce((acc, curr) => acc + curr.readingsOk, 0);
+    
     return {
-      automation: Math.round(filteredData.reduce((acc, curr) => acc + curr.automation, 0) / filteredData.length),
-      precision: Number((filteredData.reduce((acc, curr) => acc + curr.precision, 0) / filteredData.length).toFixed(1)),
-      fluidity: Math.round(filteredData.reduce((acc, curr) => acc + curr.fluidity, 0) / filteredData.length),
+      automation: Math.round(filteredData.reduce((acc, curr) => acc + curr.automationRate, 0) / filteredData.length),
+      precision: Number(((totalReadings / totalVehicles) * 100).toFixed(2)),
+      fluidity: Number((filteredData.reduce((acc, curr) => acc + curr.avgTimeSec, 0) / filteredData.length).toFixed(2)),
+      revenue: Math.round(filteredData.reduce((acc, curr) => acc + curr.revenueUsd, 0) / Array.from(new Set(filteredData.map(f => f.date))).length), // Daily average
+      errors: Number((filteredData.reduce((acc, curr) => acc + curr.errorRate, 0) / filteredData.length).toFixed(2)),
     };
   }, [filteredData]);
 
-  const globalAverages = useMemo(() => {
-    return {
-      automation: Math.round(tollingData.reduce((acc, curr) => acc + curr.automation, 0) / tollingData.length),
-      precision: Number((tollingData.reduce((acc, curr) => acc + curr.precision, 0) / tollingData.length).toFixed(1)),
-      fluidity: Math.round(tollingData.reduce((acc, curr) => acc + curr.fluidity, 0) / tollingData.length),
-    };
-  }, []);
+  const currentCountryDetail = useMemo(() => {
+    if (!selectedCountry) return null;
+    return summaries.find(c => c?.name === selectedCountry) || null;
+  }, [selectedCountry, summaries]);
 
   const timelineData = useMemo(() => {
-    if (selectedCountry) {
-      return generateTimeline(selectedCountry.volume, selectedCountry.revenue);
-    }
-    const totalVol = filteredData.reduce((acc, curr) => acc + curr.volume, 0);
-    const totalRev = filteredData.reduce((acc, curr) => acc + curr.revenue, 0);
-    return generateTimeline(totalVol, totalRev);
-  }, [selectedCountry, filteredData]);
+    const dailyData = Array.from(new Set(filteredData.map(f => f.date))).sort().map(date => {
+      const dayFacts = filteredData.filter(f => f.date === date);
+      return {
+        date,
+        volume: dayFacts.reduce((acc, curr) => acc + curr.vehiclesDay, 0),
+        revenue: dayFacts.reduce((acc, curr) => acc + curr.revenueUsd, 0)
+      };
+    });
+    return dailyData;
+  }, [filteredData]);
 
   const resetFilters = () => {
     setSelectedRegion('Tous');
     setSelectedTech('Toutes');
+    setSelectedLLM('Tous');
+    setSelectedDate('Toutes');
     setSelectedCountry(null);
     setSearchQuery('');
   };
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
-    return tollingData.filter(d => 
+    return countriesData.filter(d => 
       d.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [searchQuery]);
@@ -167,7 +212,7 @@ function DashboardContent() {
                       <button
                         key={country.id}
                         onClick={() => {
-                          setSelectedCountry(country);
+                          setSelectedCountry(country.name);
                           setSearchQuery(country.name);
                           setShowSearchResults(false);
                         }}
@@ -188,28 +233,70 @@ function DashboardContent() {
               </AnimatePresence>
             </div>
 
-            <div className="hidden md:flex items-center gap-4">
+            <div className="hidden xl:flex items-center gap-4">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Date</span>
+                <div className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-slate-400" />
+                  <select 
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className={cn(
+                      "bg-transparent text-[11px] font-medium border-none focus:ring-0 cursor-pointer transition-colors max-w-[100px]",
+                      isDarkMode ? "text-slate-200" : "text-slate-700"
+                    )}
+                  >
+                    {dates.map(d => <option key={d} value={d} className={isDarkMode ? "bg-slate-900" : "bg-white"}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className={cn("w-px h-8", isDarkMode ? "bg-slate-800" : "bg-slate-200")} />
+
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">IA (LLM)</span>
+                <div className="flex items-center gap-1">
+                  <Brain className="w-3 h-3 text-blue-400" />
+                  <select 
+                    value={selectedLLM}
+                    onChange={(e) => setSelectedLLM(e.target.value)}
+                    className={cn(
+                      "bg-transparent text-[11px] font-medium border-none focus:ring-0 cursor-pointer transition-colors",
+                      isDarkMode ? "text-slate-200" : "text-slate-700"
+                    )}
+                  >
+                    <option value="Tous" className={isDarkMode ? "bg-slate-900" : "bg-white"}>Tous</option>
+                    <option value="Oui" className={isDarkMode ? "bg-slate-900" : "bg-white"}>Oui</option>
+                    <option value="Non" className={isDarkMode ? "bg-slate-900" : "bg-white"}>Non</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className={cn("w-px h-8", isDarkMode ? "bg-slate-800" : "bg-slate-200")} />
+
               <div className="flex flex-col">
                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Région</span>
                 <select 
                   value={selectedRegion}
                   onChange={(e) => setSelectedRegion(e.target.value)}
                   className={cn(
-                    "bg-transparent text-sm font-medium border-none focus:ring-0 cursor-pointer transition-colors",
+                    "bg-transparent text-[11px] font-medium border-none focus:ring-0 cursor-pointer transition-colors",
                     isDarkMode ? "text-slate-200" : "text-slate-700"
                   )}
                 >
                   {regions.map(r => <option key={r} value={r} className={isDarkMode ? "bg-slate-900" : "bg-white"}>{r}</option>)}
                 </select>
               </div>
+
               <div className={cn("w-px h-8", isDarkMode ? "bg-slate-800" : "bg-slate-200")} />
+
               <div className="flex flex-col">
                 <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Technologie</span>
                 <select 
                   value={selectedTech}
                   onChange={(e) => setSelectedTech(e.target.value)}
                   className={cn(
-                    "bg-transparent text-sm font-medium border-none focus:ring-0 cursor-pointer transition-colors",
+                    "bg-transparent text-[11px] font-medium border-none focus:ring-0 cursor-pointer transition-colors",
                     isDarkMode ? "text-slate-200" : "text-slate-700"
                   )}
                 >
@@ -260,33 +347,35 @@ function DashboardContent() {
                 automation={globalKpis.automation}
                 precision={globalKpis.precision}
                 fluidity={globalKpis.fluidity}
-                refAutomation={globalAverages.automation}
-                refPrecision={globalAverages.precision}
-                refFluidity={globalAverages.fluidity}
+                revenue={globalKpis.revenue}
+                errors={globalKpis.errors}
                />
             </div>
 
             {/* Visualizer Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <WorldMap 
-                data={filteredData} 
-                onSelectCountry={setSelectedCountry} 
-                selectedCountryId={selectedCountry?.id}
+                data={summaries as any[]} 
+                onSelectCountry={(c: any) => setSelectedCountry(c.name)} 
+                selectedCountryId={currentCountryDetail?.id}
+                colorBy="automation"
               />
-              <BarChart data={filteredData} />
-              <BubbleChart data={filteredData} />
+              <BarChart data={summaries as any[]} />
+              <ScatterChart data={summaries as any[]} />
+              <SankeyChart data={summaries as any[]} />
               <TimelineChart data={timelineData} />
+              <Heatmap data={filteredData} />
             </div>
 
-            <DataTable data={filteredData} />
+            <DataTable data={summaries as any[]} />
           </div>
 
           {/* Sidebar / Detail Panel */}
           <aside className="xl:col-span-1 space-y-6">
             <AnimatePresence mode="wait">
-              {selectedCountry ? (
+              {currentCountryDetail ? (
                 <motion.div
-                  key={selectedCountry.id}
+                  key={currentCountryDetail.id}
                   initial={{ x: 20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: -20, opacity: 0 }}
@@ -294,26 +383,34 @@ function DashboardContent() {
                     "border rounded-2xl p-6 h-full flex flex-col transition-colors",
                     isDarkMode ? "bg-slate-900/50 border-slate-700" : "bg-white border-slate-200 shadow-lg"
                   )}
-                  style={{ marginLeft: '0px', marginTop: '270px' }}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className={cn(
                           "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border",
-                          selectedCountry.precision > 98 && selectedCountry.errors < 2 
+                          currentCountryDetail.precision > 98 && currentCountryDetail.errors < 2 
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
-                            : selectedCountry.errors > 5 
+                            : currentCountryDetail.errors > 5 
                               ? "bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
                               : "bg-amber-500/10 text-amber-400 border-amber-500/20"
                         )}>
-                          Status: {selectedCountry.precision > 98 && selectedCountry.errors < 2 ? 'Optimal' : selectedCountry.errors > 5 ? 'Critical' : 'Warning'}
+                          Status: {currentCountryDetail.precision > 98 && currentCountryDetail.errors < 2 ? 'Optimal' : currentCountryDetail.errors > 5 ? 'Critical' : 'Warning'}
                         </span>
                       </div>
-                      <h2 className={cn("text-2xl font-bold tracking-tight", isDarkMode ? "text-white" : "text-slate-900")}>{selectedCountry.name}</h2>
-                      <p className={cn("text-sm flex items-center gap-1.5", isDarkMode ? "text-slate-400" : "text-slate-500")}>
-                        <Globe className="w-3 h-3 text-blue-500" /> {selectedCountry.region}
-                      </p>
+                      <h2 className={cn("text-2xl font-bold tracking-tight", isDarkMode ? "text-white" : "text-slate-900")}>{currentCountryDetail.name}</h2>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase border",
+                          currentCountryDetail.iaLevel === 'Extrême' ? "bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.3)]" :
+                          "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        )}>
+                          IA: {currentCountryDetail.iaLevel}
+                        </span>
+                        <p className={cn("text-sm flex items-center gap-1.5", isDarkMode ? "text-slate-400" : "text-slate-500")}>
+                          <Globe className="w-3 h-3 text-blue-500" /> {currentCountryDetail.region}
+                        </p>
+                      </div>
                     </div>
                     <button 
                       onClick={() => setSelectedCountry(null)}
@@ -329,14 +426,14 @@ function DashboardContent() {
                       <div className={cn("p-3 rounded-xl border", isDarkMode ? "bg-slate-800/40 border-slate-700/50" : "bg-slate-50 border-slate-200")}>
                         <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Daily Volume</p>
                         <div className="flex items-baseline gap-1">
-                          <span className={cn("text-lg font-mono font-bold", isDarkMode ? "text-slate-100" : "text-slate-900")}>{selectedCountry.volume.toLocaleString()}</span>
+                          <span className={cn("text-lg font-mono font-bold", isDarkMode ? "text-slate-100" : "text-slate-900")}>{Math.round(currentCountryDetail.volume).toLocaleString()}</span>
                           <span className="text-[10px] text-slate-600">v/j</span>
                         </div>
                       </div>
                       <div className={cn("p-3 rounded-xl border", isDarkMode ? "bg-slate-800/40 border-slate-700/50" : "bg-slate-50 border-slate-200")}>
                         <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-1">Daily Revenue</p>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-lg font-mono font-bold text-emerald-500">${(selectedCountry.revenue).toLocaleString()}</span>
+                          <span className="text-lg font-mono font-bold text-emerald-500">${Math.round(currentCountryDetail.revenue).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -344,32 +441,45 @@ function DashboardContent() {
                     {/* Quality Indicators */}
                     <div className={cn("space-y-4 p-4 rounded-xl border", isDarkMode ? "bg-slate-900/60 border-slate-800" : "bg-slate-50/50 border-slate-200")}>
                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                         <Activity className="w-3 h-3 text-blue-500" /> Intelligence Performance
+                         <Activity className="w-3 h-3 text-blue-500" /> Performance IA
                        </h4>
                        <div className="space-y-4">
                          <div className="space-y-1.5">
                            <div className="flex justify-between items-center text-[11px]">
-                             <span className="text-slate-400">Reading Accuracy</span>
-                             <span className="text-emerald-500 font-bold font-mono">{selectedCountry.precision}%</span>
+                             <span className="text-slate-400">Taux de Lecture</span>
+                             <span className="text-emerald-500 font-bold font-mono">{currentCountryDetail.precision.toFixed(2)}%</span>
                            </div>
                            <div className={cn("w-full h-1.5 rounded-full overflow-hidden", isDarkMode ? "bg-slate-800" : "bg-slate-200")}>
                              <motion.div 
-                               initial={{ width: 0 }}
-                               animate={{ width: `${selectedCountry.precision}%` }}
-                               className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${currentCountryDetail.precision}%` }}
+                                className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]"
                              />
                            </div>
                          </div>
                          <div className="space-y-1.5">
                            <div className="flex justify-between items-center text-[11px]">
-                             <span className="text-slate-400">System Error Rate</span>
-                             <span className={cn("font-bold font-mono", selectedCountry.errors > 5 ? 'text-red-500' : 'text-orange-500')}>{selectedCountry.errors}%</span>
+                             <span className="text-slate-400">Fluidité (sec/véh)</span>
+                             <span className="text-blue-500 font-bold font-mono">{currentCountryDetail.fluidity.toFixed(2)}s</span>
                            </div>
                            <div className={cn("w-full h-1.5 rounded-full overflow-hidden", isDarkMode ? "bg-slate-800" : "bg-slate-200")}>
                              <motion.div 
-                               initial={{ width: 0 }}
-                               animate={{ width: `${selectedCountry.errors * 5}%` }}
-                               className={cn("h-full", selectedCountry.errors > 5 ? 'bg-red-500' : 'bg-orange-500')}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(currentCountryDetail.fluidity / 2) * 100}%` }}
+                                className="h-full bg-blue-500"
+                             />
+                           </div>
+                         </div>
+                         <div className="space-y-1.5">
+                           <div className="flex justify-between items-center text-[11px]">
+                             <span className="text-slate-400">Taux d'Erreur</span>
+                             <span className={cn("font-bold font-mono", currentCountryDetail.errors > 5 ? 'text-red-500' : 'text-orange-500')}>{currentCountryDetail.errors}%</span>
+                           </div>
+                           <div className={cn("w-full h-1.5 rounded-full overflow-hidden", isDarkMode ? "bg-slate-800" : "bg-slate-200")}>
+                             <motion.div 
+                                initial={{ width: 0 }}
+                                animate={{ width: `${currentCountryDetail.errors * 5}%` }}
+                                className={cn("h-full", currentCountryDetail.errors > 5 ? 'bg-red-500' : 'bg-orange-500')}
                              />
                            </div>
                          </div>
@@ -378,9 +488,9 @@ function DashboardContent() {
 
                     {/* Technologies */}
                     <div className="space-y-3">
-                      <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Technologies Deployed</h4>
+                      <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Technologies Déployées</h4>
                       <div className="flex flex-wrap gap-2">
-                        {selectedCountry.tech.map(t => (
+                        {currentCountryDetail.tech.map(t => (
                           <div key={t} className={cn(
                             "flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-colors",
                             isDarkMode ? "bg-slate-800/80 border-slate-700 hover:border-blue-500/30" : "bg-white border-slate-200 hover:border-blue-400"
@@ -392,7 +502,7 @@ function DashboardContent() {
                       </div>
                     </div>
 
-                    {selectedCountry.errors > 5 && (
+                    {currentCountryDetail.errors > 5 && (
                       <motion.div 
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -402,7 +512,7 @@ function DashboardContent() {
                         <div>
                           <p className="text-xs font-bold text-red-500 uppercase tracking-tight">Anomalie Détectée</p>
                           <p className={cn("text-[10px] mt-1 leading-relaxed", isDarkMode ? "text-red-300/70" : "text-red-600")}>
-                            Intervention requise sur les capteurs {selectedCountry.tech[0]}. Taux de rejet supérieur aux SLAs.
+                            Intervention requise sur les capteurs {currentCountryDetail.tech[0]}. Taux de rejet supérieur aux SLAs.
                           </p>
                         </div>
                       </motion.div>
@@ -437,7 +547,7 @@ function DashboardContent() {
                   <div className="mt-12 w-full space-y-4">
                     <div className="flex items-center gap-3 text-xs text-slate-500 uppercase font-bold tracking-widest">
                       <Info className="w-4 h-4 text-blue-500" />
-                      Régions Scannées : 9
+                      Régions Scannées : {new Set(summaries.map(s => s?.region)).size}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-slate-500 uppercase font-bold tracking-widest">
                       <Activity className="w-4 h-4 text-emerald-500" />

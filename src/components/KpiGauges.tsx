@@ -5,97 +5,95 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Gauge, CheckCircle2, Zap } from 'lucide-react';
+import { Gauge, CheckCircle2, Zap, DollarSign, AlertCircle, Clock, TrendingUp } from 'lucide-react';
 import { useTheme } from '../lib/themeContext';
 import { cn } from '../lib/utils';
 
 interface KpiGaugesProps {
   automation: number;
-  precision: number;
+  precision: number; // Read Rate
   fluidity: number;
-  refAutomation?: number;
-  refPrecision?: number;
-  refFluidity?: number;
+  revenue: number;
+  errors: number;
 }
 
 export const KpiGauges: React.FC<KpiGaugesProps> = ({ 
   automation, 
   precision, 
   fluidity,
-  refAutomation,
-  refPrecision,
-  refFluidity
+  revenue,
+  errors
 }) => {
   const { isDarkMode } = useTheme();
 
-  const getStatus = (val: number) => {
-    if (val >= 95) return { label: 'Excellent', color: isDarkMode ? 'text-emerald-400' : 'text-emerald-600' };
-    if (val >= 85) return { label: 'Bon', color: isDarkMode ? 'text-sky-400' : 'text-sky-600' };
-    return { label: 'À améliorer', color: isDarkMode ? 'text-amber-400' : 'text-amber-600' };
+  const getStatus = (val: number, type: 'precision' | 'automation' | 'errors' | 'fluidity') => {
+    if (type === 'precision') {
+      if (val >= 98) return { label: 'Optimal', color: 'emerald' };
+      if (val >= 95) return { label: 'Cible', color: 'sky' };
+      return { label: 'Critique', color: 'red' };
+    }
+    if (type === 'automation') {
+      if (val >= 95) return { label: 'Élevé', color: 'emerald' };
+      if (val >= 90) return { label: 'Cible', color: 'sky' };
+      return { label: 'Bas', color: 'amber' };
+    }
+    if (type === 'errors') {
+      if (val <= 1) return { label: 'Minimal', color: 'emerald' };
+      if (val <= 5) return { label: 'Cible', color: 'sky' };
+      return { label: 'Critique', color: 'red' };
+    }
+    if (type === 'fluidity') {
+      if (val < 1.5) return { label: 'Fluide', color: 'emerald' };
+      if (val <= 2) return { label: 'Cible', color: 'sky' };
+      return { label: 'Lent', color: 'amber' };
+    }
+    return { label: '--', color: 'slate' };
   };
 
-  const renderGauge = (title: string, value: number, refValue: number | undefined, icon: React.ReactNode, extraStyle?: React.CSSProperties) => {
-    const status = getStatus(value);
-    const circumference = 2 * Math.PI * 40;
-    const offset = circumference - (value / 100) * circumference;
+  const renderMetric = (title: string, value: string | number, unit: string, type: any, icon: React.ReactNode) => {
+    const status = getStatus(typeof value === 'number' ? value : 0, type);
+    const colorClass = {
+      emerald: isDarkMode ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : 'text-emerald-600 bg-emerald-50 border-emerald-200',
+      sky: isDarkMode ? 'text-sky-400 bg-sky-400/10 border-sky-400/20' : 'text-sky-600 bg-sky-50 border-sky-200',
+      amber: isDarkMode ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' : 'text-amber-600 bg-amber-50 border-amber-200',
+      red: isDarkMode ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-red-600 bg-red-50 border-red-200',
+      slate: isDarkMode ? 'text-slate-400 bg-slate-400/10 border-slate-400/20' : 'text-slate-600 bg-slate-50 border-slate-200',
+    }[status.color];
 
     return (
-      <div 
+      <motion.div 
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
         className={cn(
-          "flex flex-col items-center p-4 rounded-xl border transition-colors",
-          isDarkMode ? "bg-slate-900/40 border-slate-700/50" : "bg-white border-slate-200"
+          "flex-1 p-4 rounded-2xl border transition-all flex flex-col items-center justify-center min-w-[140px]",
+          isDarkMode ? "bg-slate-900/40 border-slate-800" : "bg-white border-slate-200 shadow-sm"
         )}
-        style={extraStyle}
       >
-        <div className="relative w-24 h-24 mb-3">
-          <svg className="w-full h-full -rotate-90">
-            <circle
-              cx="48"
-              cy="48"
-              r="40"
-              fill="none"
-              stroke={isDarkMode ? "#1e293b" : "#f1f5f9"}
-              strokeWidth="8"
-            />
-            <motion.circle
-              cx="48"
-              cy="48"
-              r="40"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="8"
-              strokeDasharray={circumference}
-              initial={{ strokeDashoffset: circumference }}
-              animate={{ strokeDashoffset: offset }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              className={status.color}
-            />
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center flex-col">
-            <span className={cn("text-xl font-bold transition-colors", isDarkMode ? "text-slate-100" : "text-slate-900")}>{value}%</span>
-          </div>
+        <div className={cn("p-2 rounded-lg mb-3 shadow-sm", colorClass)}>
+          {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' })}
         </div>
-        <div className="flex items-center gap-2 mb-1">
-          {icon}
-          <span className={cn("text-xs font-medium uppercase tracking-tight transition-colors", isDarkMode ? "text-slate-300" : "text-slate-600")}>{title}</span>
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{title}</span>
+        <div className="flex items-baseline gap-1 mb-2">
+          <span className={cn("text-xl font-mono font-bold", isDarkMode ? "text-slate-100" : "text-slate-900")}>
+            {value}
+          </span>
+          <span className="text-[10px] text-slate-500 font-bold">{unit}</span>
         </div>
-        <span className={cn("text-[10px] font-bold uppercase mb-2", status.color)}>{status.label}</span>
-        
-        {refValue !== undefined && (
-          <div className={cn("w-full pt-2 border-t mt-1 flex items-center justify-between px-2 transition-colors", isDarkMode ? "border-slate-800/50" : "border-slate-100")}>
-            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Moy. Global</span>
-            <span className={cn("text-[10px] font-mono transition-colors", isDarkMode ? "text-slate-400" : "text-slate-500")}>{refValue}%</span>
-          </div>
-        )}
-      </div>
+        <div className={cn("px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter border", colorClass)}>
+          {status.label}
+        </div>
+      </motion.div>
     );
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-      {renderGauge("Automation", automation, refAutomation, <Zap className="w-3 h-3" />, { width: '405.219px', marginLeft: '49px' })}
-      {renderGauge("Précision", precision, refPrecision, <CheckCircle2 className="w-3 h-3" />, { marginLeft: '220px', marginRight: '22px', marginTop: '0px', width: '345.552px', marginBottom: '0px' })}
-      {renderGauge("Fluidité", fluidity, refFluidity, <Gauge className="w-3 h-3" />, { width: '334px', marginLeft: '333px', marginRight: '11px', marginTop: '0px' })}
+    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 w-full">
+      {renderMetric("Taux Lecture", precision, "%", "precision", <CheckCircle2 />)}
+      {renderMetric("Automation", automation, "%", "automation", <Zap />)}
+      {renderMetric("Rev. Annuels", ((revenue * 365) / 1000000000).toFixed(2), "Md$", "revenue", <DollarSign />)}
+      {renderMetric("Recettes/j", (revenue / 1000000).toFixed(1), "M$", "revenue", <TrendingUp />)}
+      {renderMetric("Erreurs", errors, "%", "errors", <AlertCircle />)}
+      {renderMetric("Fluidité", fluidity, "s", "fluidity", <Clock />)}
     </div>
   );
 };

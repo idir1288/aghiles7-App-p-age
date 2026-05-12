@@ -3,147 +3,132 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type TollingTechnology = 'ANPR/LPR' | 'RFID/E-TAG' | 'GNSS' | 'DSRC' | 'IA Caméras' | 'ETC' | 'FASTag';
+export type TollingTechnology = 'ANPR + RFID' | 'GNSS + OBU' | 'GNSS + ANPR' | 'RFID + ANPR' | 'FASTag RFID + ANPR' | 'GNSS + ERP' | 'E-Tag + ANPR' | 'RFID + IA vidéo';
 
-export interface CountryData {
+export interface TollingFact {
+  date: string;
+  country: string;
+  region: string;
+  tech: TollingTechnology;
+  iaLevel: 'Intermédiaire' | 'Moyen' | 'Avancé' | 'Très avancé' | 'Extrême';
+  iaClassification: string;
+  llmStatus: string;
+  vehiclesDay: number;
+  readingsOk: number;
+  errorRate: number; // %
+  automationRate: number; // %
+  precisionRate: number; // %
+  revenueUsd: number;
+  avgTimeSec: number;
+  fraudDetection: boolean;
+  realTimeVision: 'Faible' | 'Moyen' | 'Oui' | 'Oui avancée' | 'Oui massive';
+  vehicleClassification: 'Oui' | 'Oui avancée' | 'Oui massive';
+  predictiveCongestion: 'Faible' | 'Moyen' | 'Oui avancée' | 'Oui massive';
+  electronicAdoption: number; // %
+  coordinates: [number, number];
+}
+
+export interface CountrySummary {
   id: string;
   name: string;
-  region: 'Europe' | 'Amérique' | 'Asie' | 'Australie' | 'Singapour' | 'France';
-  tech: TollingTechnology[];
-  automation: number; // 0-100
-  precision: number; // 0-100
-  fluidity: number; // 0-100
-  volume: number; // vehicles per day
-  revenue: number; // daily revenue in USD
-  errors: number; // error rate percentage
-  coordinates: [number, number]; // [lat, lng] for map
-}
-
-export const tollingData: CountryData[] = [
-  {
-    id: 'germany',
-    name: 'Allemagne',
-    region: 'Europe',
-    tech: ['GNSS'],
-    automation: 95,
-    precision: 97.5,
-    fluidity: 90,
-    volume: 2900000,
-    revenue: 12300000,
-    errors: 2.5,
-    coordinates: [51.1657, 10.4515]
-  },
-  {
-    id: 'poland',
-    name: 'Pologne',
-    region: 'Europe',
-    tech: ['GNSS'],
-    automation: 85,
-    precision: 96,
-    fluidity: 82,
-    volume: 1200000,
-    revenue: 4800000,
-    errors: 4,
-    coordinates: [51.9194, 19.1451]
-  },
-  {
-    id: 'spain',
-    name: 'Espagne',
-    region: 'Europe',
-    tech: ['RFID/E-TAG', 'ANPR/LPR'],
-    automation: 88,
-    precision: 96.5,
-    fluidity: 88,
-    volume: 1800000,
-    revenue: 18000000,
-    errors: 3.5,
-    coordinates: [40.4168, -3.7038]
-  },
-  {
-    id: 'france',
-    name: 'France',
-    region: 'France',
-    tech: ['ANPR/LPR'],
-    automation: 75,
-    precision: 95.5,
-    fluidity: 85,
-    volume: 1100000,
-    revenue: 32600000,
-    errors: 4.5,
-    coordinates: [46.2276, 2.2137]
-  },
-  {
-    id: 'india',
-    name: 'Inde',
-    region: 'Asie',
-    tech: ['RFID/E-TAG'],
-    automation: 99.97,
-    precision: 99.97,
-    fluidity: 92,
-    volume: 1560000,
-    revenue: 2470000,
-    errors: 0.03,
-    coordinates: [20.5937, 78.9629]
-  },
-  {
-    id: 'singapore',
-    name: 'Singapour',
-    region: 'Singapour',
-    tech: ['GNSS'],
-    automation: 100,
-    precision: 99,
-    fluidity: 98,
-    volume: 450000,
-    revenue: 8000000,
-    errors: 1,
-    coordinates: [1.3521, 103.8198]
-  },
-  {
-    id: 'usa',
-    name: 'USA',
-    region: 'Amérique',
-    tech: ['RFID/E-TAG', 'ANPR/LPR'],
-    automation: 92,
-    precision: 97,
-    fluidity: 92,
-    volume: 2800000,
-    revenue: 13800000,
-    errors: 3,
-    coordinates: [37.0902, -95.7129]
-  },
-  {
-    id: 'australia',
-    name: 'Australie',
-    region: 'Australie',
-    tech: ['RFID/E-TAG'],
-    automation: 100,
-    precision: 98,
-    fluidity: 95,
-    volume: 950000,
-    revenue: 11900000,
-    errors: 2,
-    coordinates: [-25.2744, 133.7751]
-  }
-];
-
-export interface TimelinePoint {
-  date: string;
+  region: string;
+  automation: number;
+  precision: number;
+  fluidity: number;
   volume: number;
   revenue: number;
+  errors: number;
+  tech: TollingTechnology[];
+  iaLevel: string;
+  electronicAdoption: number;
+  coordinates: [number, number];
 }
 
-export const generateTimeline = (baseVolume: number, baseRevenue: number): TimelinePoint[] => {
-  const points: TimelinePoint[] = [];
-  const startDate = new Date(2023, 0, 1);
-  for (let i = 0; i < 40; i++) {
-    const date = new Date(startDate);
-    date.setMonth(startDate.getMonth() + i);
-    const growth = 1 + (i * 0.02) + (Math.random() * 0.05 - 0.025);
-    points.push({
-      date: date.toISOString().substring(0, 7),
-      volume: Math.floor(baseVolume * growth),
-      revenue: Math.floor(baseRevenue * growth)
+export const countriesData = [
+  { id: 'france', name: 'France', region: 'Europe', coords: [46.2276, 2.2137], tech: 'ANPR + RFID', ia: 'Oui', llm: 'Expérimental', iaLevel: 'Intermédiaire', fraud: true, vision: 'Moyen', classif: 'Oui', congestion: 'Faible', adoption: 75 },
+  { id: 'germany', name: 'Allemagne', region: 'Europe', coords: [51.1657, 10.4515], tech: 'GNSS + OBU', ia: 'Oui', llm: 'Non public', iaLevel: 'Avancé', fraud: true, vision: 'Moyen', classif: 'Oui avancée', congestion: 'Moyen', adoption: 99 },
+  { id: 'poland', name: 'Pologne', region: 'Europe', coords: [51.9194, 19.1451], tech: 'GNSS + ANPR', ia: 'Oui', llm: 'Non public', iaLevel: 'Moyen', fraud: true, vision: 'Faible', classif: 'Oui', congestion: 'Faible', adoption: 85 },
+  { id: 'spain', name: 'Espagne', region: 'Europe', coords: [40.4168, -3.7038], tech: 'RFID + ANPR', ia: 'Oui', llm: 'Non public', iaLevel: 'Moyen', fraud: true, vision: 'Moyen', classif: 'Oui', congestion: 'Faible', adoption: 88 },
+  { id: 'india', name: 'Inde', region: 'Asie', coords: [20.5937, 78.9629], tech: 'FASTag RFID + ANPR', ia: 'Oui', llm: 'Non public', iaLevel: 'Avancé', fraud: true, vision: 'Moyen', classif: 'Oui', congestion: 'Moyen', adoption: 97 },
+  { id: 'singapore', name: 'Singapour', region: 'Singapour', coords: [1.3521, 103.8198], tech: 'GNSS + ERP', ia: 'Oui avancée', llm: 'Probable', iaLevel: 'Très avancé', fraud: true, vision: 'Oui avancée', classif: 'Oui', congestion: 'Oui avancée', adoption: 99 },
+  { id: 'usa', name: 'USA', region: 'Amérique', coords: [37.0902, -95.7129], tech: 'RFID + ANPR', ia: 'Oui', llm: 'Localement', iaLevel: 'Très avancé', fraud: true, vision: 'Oui', classif: 'Oui', congestion: 'Moyen', adoption: 94 },
+  { id: 'australia', name: 'Australie', region: 'Australie', coords: [-25.2744, 133.7751], tech: 'E-Tag + ANPR', ia: 'Oui', llm: 'Non public', iaLevel: 'Très avancé', fraud: true, vision: 'Oui', classif: 'Oui', congestion: 'Moyen', adoption: 98 },
+  { id: 'china', name: 'Chine', region: 'Asie', coords: [35.8617, 104.1954], tech: 'RFID + IA vidéo', ia: 'Oui avancée', llm: 'Probable', iaLevel: 'Extrême', fraud: true, vision: 'Oui massive', classif: 'Oui massive', congestion: 'Oui massive', adoption: 99 },
+];
+
+export const generateTollingFacts = (): TollingFact[] => {
+  const facts: TollingFact[] = [];
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 30);
+
+  const baseData: Record<string, any> = {
+    'France': { vol: 1500000, read: 1440000, err: 4.0, auto: 88, prec: 96, rev: 18, time: 2.1 },
+    'Allemagne': { vol: 2900000, read: 2813000, err: 3.0, auto: 95, prec: 97, rev: 42, time: 1.3 },
+    'Pologne': { vol: 1200000, read: 1152000, err: 4.0, auto: 85, prec: 96, rev: 9, time: 1.8 },
+    'Espagne': { vol: 1800000, read: 1746000, err: 3.0, auto: 88, prec: 97, rev: 16, time: 1.9 },
+    'Inde': { vol: 35000000, read: 34020000, err: 2.8, auto: 94, prec: 97.2, rev: 85, time: 1.4 },
+    'Singapour': { vol: 950000, read: 940500, err: 1.0, auto: 99, prec: 99, rev: 7, time: 0.8 },
+    'USA': { vol: 18000000, read: 17460000, err: 3.0, auto: 95, prec: 97, rev: 110, time: 1.5 },
+    'Australie': { vol: 3500000, read: 3451000, err: 1.4, auto: 98, prec: 98.6, rev: 28, time: 1.0 },
+    'Chine': { vol: 60000000, read: 59400000, err: 1.0, auto: 99, prec: 99, rev: 210, time: 0.7 },
+  };
+
+  for (let i = 0; i < 30; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + i);
+    const dateStr = currentDate.toISOString().split('T')[0];
+
+    countriesData.forEach(c => {
+      const base = baseData[c.name];
+      const variance = (Math.random() * 0.05) + 0.975; // Smaller variance for "exact" figures
+      const vehicles = Math.floor(base.vol * variance);
+      
+      facts.push({
+        date: dateStr,
+        country: c.name,
+        region: c.region,
+        tech: c.tech as TollingTechnology,
+        iaLevel: c.iaLevel as any,
+        iaClassification: c.ia,
+        llmStatus: c.llm,
+        vehiclesDay: vehicles,
+        readingsOk: Math.floor(vehicles * (base.prec / 100)),
+        errorRate: base.err,
+        automationRate: base.auto,
+        precisionRate: base.prec,
+        revenueUsd: base.rev * 1000000 * variance,
+        avgTimeSec: base.time,
+        fraudDetection: c.fraud,
+        realTimeVision: c.vision as any,
+        vehicleClassification: c.classif as any,
+        predictiveCongestion: c.congestion as any,
+        electronicAdoption: c.adoption,
+        coordinates: c.coords as [number, number]
+      });
     });
   }
-  return points;
+  return facts;
 };
+
+export const tollingFacts = generateTollingFacts();
+
+export const countrySummaries: CountrySummary[] = countriesData.map(c => {
+  const f = tollingFacts.find(fact => fact.country === c.name && fact.date === tollingFacts[tollingFacts.length-1].date)!;
+  return {
+    id: c.id,
+    name: c.name,
+    region: c.region,
+    automation: f.automationRate,
+    precision: f.precisionRate,
+    fluidity: f.avgTimeSec,
+    volume: f.vehiclesDay,
+    revenue: f.revenueUsd,
+    errors: f.errorRate,
+    tech: [c.tech] as TollingTechnology[],
+    iaLevel: c.iaLevel,
+    electronicAdoption: c.adoption,
+    coordinates: c.coords as [number, number]
+  };
+});
+
+
