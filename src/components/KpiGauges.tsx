@@ -5,7 +5,9 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Gauge, CheckCircle2, Zap, ArrowRight } from 'lucide-react';
+import { Gauge, CheckCircle2, Zap } from 'lucide-react';
+import { useTheme } from '../lib/themeContext';
+import { cn } from '../lib/utils';
 
 interface KpiGaugesProps {
   automation: number;
@@ -24,10 +26,12 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
   refPrecision,
   refFluidity
 }) => {
+  const { isDarkMode } = useTheme();
+
   const getStatus = (val: number) => {
-    if (val >= 95) return { label: 'Excellent', color: 'text-emerald-400' };
-    if (val >= 85) return { label: 'Bon', color: 'text-sky-400' };
-    return { label: 'À améliorer', color: 'text-amber-400' };
+    if (val >= 95) return { label: 'Excellent', color: isDarkMode ? 'text-emerald-400' : 'text-emerald-600' };
+    if (val >= 85) return { label: 'Bon', color: isDarkMode ? 'text-sky-400' : 'text-sky-600' };
+    return { label: 'À améliorer', color: isDarkMode ? 'text-amber-400' : 'text-amber-600' };
   };
 
   const renderGauge = (title: string, value: number, refValue: number | undefined, icon: React.ReactNode) => {
@@ -36,7 +40,10 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
     const offset = circumference - (value / 100) * circumference;
 
     return (
-      <div className="flex flex-col items-center bg-slate-900/40 p-4 rounded-xl border border-slate-700/50">
+      <div className={cn(
+        "flex flex-col items-center p-4 rounded-xl border transition-colors",
+        isDarkMode ? "bg-slate-900/40 border-slate-700/50" : "bg-white border-slate-200"
+      )}>
         <div className="relative w-24 h-24 mb-3">
           <svg className="w-full h-full -rotate-90">
             <circle
@@ -44,7 +51,7 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
               cy="48"
               r="40"
               fill="none"
-              stroke="#1e293b"
+              stroke={isDarkMode ? "#1e293b" : "#f1f5f9"}
               strokeWidth="8"
             />
             <motion.circle
@@ -62,19 +69,19 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center flex-col">
-            <span className="text-xl font-bold text-slate-100">{value}%</span>
+            <span className={cn("text-xl font-bold transition-colors", isDarkMode ? "text-slate-100" : "text-slate-900")}>{value}%</span>
           </div>
         </div>
         <div className="flex items-center gap-2 mb-1">
           {icon}
-          <span className="text-xs font-medium text-slate-300 uppercase tracking-tight">{title}</span>
+          <span className={cn("text-xs font-medium uppercase tracking-tight transition-colors", isDarkMode ? "text-slate-300" : "text-slate-600")}>{title}</span>
         </div>
-        <span className={`text-[10px] font-bold uppercase mb-2 ${status.color}`}>{status.label}</span>
+        <span className={cn("text-[10px] font-bold uppercase mb-2", status.color)}>{status.label}</span>
         
         {refValue !== undefined && (
-          <div className="w-full pt-2 border-t border-slate-800/50 mt-1 flex items-center justify-between px-2">
-            <span className="text-[9px] text-slate-500 font-bold uppercase">Réf. Mond.</span>
-            <span className="text-[10px] font-mono text-slate-400">{refValue}%</span>
+          <div className={cn("w-full pt-2 border-t mt-1 flex items-center justify-between px-2 transition-colors", isDarkMode ? "border-slate-800/50" : "border-slate-100")}>
+            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Moy. Global</span>
+            <span className={cn("text-[10px] font-mono transition-colors", isDarkMode ? "text-slate-400" : "text-slate-500")}>{refValue}%</span>
           </div>
         )}
       </div>

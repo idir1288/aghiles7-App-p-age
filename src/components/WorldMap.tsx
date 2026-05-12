@@ -8,6 +8,7 @@ import { CountryData } from '../data/tollData';
 import { motion, AnimatePresence } from 'motion/react';
 import { ZoomIn, ZoomOut, Maximize, MousePointer2, RefreshCcw } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useTheme } from '../lib/themeContext';
 
 interface WorldMapProps {
   data: CountryData[];
@@ -16,6 +17,7 @@ interface WorldMapProps {
 }
 
 export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selectedCountryId }) => {
+  const { isDarkMode } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -82,9 +84,24 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
 
   const [lastPointerPos, setLastPointerPos] = useState({ x: 0, y: 0 });
   const [hasMoved, setHasMoved] = useState(false);
+  const [pendingCountry, setPendingCountry] = useState<CountryData | null>(null);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    
+    // Check if we hit a bubble by looking at the target's ancestry
+    const target = e.target as HTMLElement;
+    const bubbleGroup = target.closest('[data-country-id]');
+    if (bubbleGroup) {
+      const countryId = bubbleGroup.getAttribute('data-country-id');
+      const country = data.find(c => c.id === countryId);
+      if (country) {
+        setPendingCountry(country);
+      }
+    } else {
+      setPendingCountry(null);
+    }
+
     setIsDragging(true);
     setHasMoved(false);
     setLastPointerPos({ x: e.clientX, y: e.clientY });
@@ -99,7 +116,8 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
     const dx = e.clientX - lastPointerPos.x;
     const dy = e.clientY - lastPointerPos.y;
     
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+    // Threshold to differentiate click vs drag
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
       setHasMoved(true);
     }
 
@@ -111,16 +129,18 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    const wasDragging = isDragging;
     setIsDragging(false);
+    
+    // If it was a click (not a significant drag) and we were over a bubble
+    if (wasDragging && !hasMoved && pendingCountry) {
+      onSelectCountry(pendingCountry);
+    }
+    
+    setPendingCountry(null);
+    
     if (containerRef.current) {
       containerRef.current.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  const onBubbleClick = (e: React.MouseEvent, country: CountryData) => {
-    e.stopPropagation();
-    if (!hasMoved) {
-      onSelectCountry(country);
     }
   };
 
@@ -132,8 +152,9 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
   return (
     <div 
       className={cn(
-        "relative bg-[#0f172a] rounded-xl border border-slate-700 overflow-hidden group select-none touch-none transition-all duration-300",
-        isExpanded ? "fixed inset-4 z-[100] shadow-2xl" : "w-full h-[400px]"
+        "relative rounded-xl border overflow-hidden group select-none touch-none transition-all duration-300",
+        isExpanded ? "fixed inset-4 z-[100] shadow-2xl" : "w-full h-[400px]",
+        isDarkMode ? "bg-[#0f172a] border-slate-700" : "bg-white border-slate-200 shadow-sm"
       )}
       ref={containerRef}
       onPointerDown={handlePointerDown}
@@ -153,7 +174,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
 
       {/* Overlay UI */}
       <div className="absolute top-4 left-4 z-10 pointer-events-none group-hover:opacity-100 transition-opacity">
-        <h3 className="text-slate-200 font-bold text-sm uppercase tracking-[0.2em]">Map Explorer</h3>
+        <h3 className={cn("font-bold text-sm uppercase tracking-[0.2em] transition-colors", isDarkMode ? "text-slate-200" : "text-slate-900")}>Map Explorer</h3>
         <p className="text-blue-500 text-[10px] font-black mt-1">SENSORS STATUS: ACTIVE</p>
       </div>
 
@@ -161,14 +182,20 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
         <button 
           onPointerDown={e => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); setScale(prev => Math.min(prev * 1.3, 8)); }}
-          className="p-2 bg-slate-800/90 hover:bg-blue-600 rounded-lg border border-slate-700 text-slate-300 transition-all hover:scale-110 active:scale-95"
+          className={cn(
+            "p-2 rounded-lg border transition-all hover:scale-110 active:scale-95",
+            isDarkMode ? "bg-slate-800/90 hover:bg-blue-600 border-slate-700 text-slate-300" : "bg-white hover:bg-blue-50 border-slate-200 text-slate-600"
+          )}
         >
           <ZoomIn className="w-5 h-5" />
         </button>
         <button 
           onPointerDown={e => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); setScale(prev => Math.max(prev / 1.3, 0.4)); }}
-          className="p-2 bg-slate-800/90 hover:bg-blue-600 rounded-lg border border-slate-700 text-slate-300 transition-all hover:scale-110 active:scale-95"
+          className={cn(
+            "p-2 rounded-lg border transition-all hover:scale-110 active:scale-95",
+            isDarkMode ? "bg-slate-800/90 hover:bg-blue-600 border-slate-700 text-slate-300" : "bg-white hover:bg-blue-50 border-slate-200 text-slate-600"
+          )}
         >
           <ZoomOut className="w-5 h-5" />
         </button>
@@ -177,7 +204,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
           onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
           className={cn(
             "p-2 rounded-lg border transition-all hover:scale-110 active:scale-95",
-            isExpanded ? "bg-red-600 text-white border-red-500" : "bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-blue-600"
+            isExpanded ? "bg-red-600 text-white border-red-500" : (isDarkMode ? "bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-blue-600" : "bg-white text-slate-600 border-slate-200 hover:bg-blue-50")
           )}
         >
           <Maximize className="w-5 h-5" />
@@ -185,16 +212,22 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
         <button 
           onPointerDown={e => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); resetView(); }}
-          className="p-2 bg-slate-800/90 hover:bg-slate-700 rounded-lg border border-slate-700 text-slate-400 transition-all"
+          className={cn(
+            "p-2 rounded-lg border transition-all",
+            isDarkMode ? "bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-400" : "bg-white hover:bg-slate-50 border-slate-200 text-slate-400"
+          )}
           title="Reset View"
         >
-          <RefreshCcw className="w-4 h-4" />
+          <RefreshCcw className={cn("w-4 h-4", isDarkMode ? "" : "text-slate-300")} />
         </button>
       </div>
 
-      <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3 text-[9px] text-slate-500 font-black uppercase tracking-widest bg-slate-900/40 p-2 rounded-md backdrop-blur-sm border border-slate-800">
+      <div className={cn(
+        "absolute bottom-4 left-4 z-10 flex items-center gap-3 text-[9px] font-black uppercase tracking-widest p-2 rounded-md backdrop-blur-sm border transition-colors",
+        isDarkMode ? "text-slate-500 bg-slate-900/40 border-slate-800" : "text-slate-400 bg-white/80 border-slate-200 shadow-sm"
+      )}>
         <div className="flex items-center gap-1.5"><MousePointer2 className="w-3 h-3 text-blue-500" /> Pan & Zoom Active</div>
-        <div className="w-px h-3 bg-slate-800" />
+        <div className={cn("w-px h-3", isDarkMode ? "bg-slate-800" : "bg-slate-100")} />
         <div>Scale: {scale.toFixed(1)}x</div>
       </div>
       
@@ -221,10 +254,10 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
           {bubbles.map((b) => (
             <motion.g
               key={b.id}
+              data-country-id={b.id}
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               whileHover={{ scale: 1.1 }}
-              onClick={(e) => onBubbleClick(e, b)}
               className="cursor-pointer"
             >
               <circle
@@ -281,7 +314,12 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
                 y={b.y - b.radius - 10 / scale}
                 textAnchor="middle"
                 style={{ fontSize: `${selectedCountryId === b.id ? 14 / scale : 10 / scale}px` }}
-                className={`font-mono pointer-events-none transition-all ${selectedCountryId === b.id ? 'fill-white font-black drop-shadow-lg' : 'fill-slate-400 group-hover:fill-slate-200'}`}
+                className={cn(
+                  "font-mono pointer-events-none transition-all",
+                  selectedCountryId === b.id 
+                    ? (isDarkMode ? 'fill-white font-black drop-shadow-lg' : 'fill-slate-900 font-black drop-shadow-sm') 
+                    : (isDarkMode ? 'fill-slate-400 group-hover:fill-slate-200' : 'fill-slate-400 group-hover:fill-blue-600')
+                )}
               >
                 {b.name}
               </text>
