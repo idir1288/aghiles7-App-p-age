@@ -40,10 +40,13 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
     const offset = circumference - (value / 100) * circumference;
 
     return (
-      <div className={cn(
-        "flex flex-col items-center p-4 rounded-xl border transition-colors",
-        isDarkMode ? "bg-slate-900/40 border-slate-700/50" : "bg-white border-slate-200"
-      )}>
+      <div 
+        className={cn(
+          "flex flex-col items-center p-4 rounded-xl border transition-colors",
+          isDarkMode ? "bg-slate-900/40 border-slate-700/50" : "bg-white border-slate-200"
+        )}
+        style={{ width: '440.219px' }}
+      >
         <div className="relative w-24 h-24 mb-3">
           <svg className="w-full h-full -rotate-90">
             <circle
