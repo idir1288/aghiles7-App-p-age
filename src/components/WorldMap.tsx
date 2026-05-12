@@ -6,7 +6,8 @@
 import React, { useMemo, useState, useRef, useCallback } from 'react';
 import { CountryData } from '../data/tollData';
 import { motion, AnimatePresence } from 'motion/react';
-import { ZoomIn, ZoomOut, Maximize, MousePointer2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, MousePointer2, RefreshCcw } from 'lucide-react';
+import { cn } from '../lib/utils';
 
 interface WorldMapProps {
   data: CountryData[];
@@ -15,6 +16,7 @@ interface WorldMapProps {
 }
 
 export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selectedCountryId }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -26,9 +28,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
       const country = data.find(c => c.id === selectedCountryId);
       if (country) {
         const { x, y } = getXY(country.coordinates[0], country.coordinates[1]);
-        // Center the bubble in the 800x400 view
-        // targetPos = center - (bubblePos * scale)
-        const targetScale = 2;
+        const targetScale = 2.5;
         setScale(targetScale);
         setPosition({
           x: (400 - x * targetScale),
@@ -37,6 +37,21 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
       }
     }
   }, [selectedCountryId, data]);
+
+  // Fix wheel zoom with non-passive listener
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.85 : 1.15;
+      setScale(prev => Math.min(Math.max(prev * delta, 0.5), 8));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   // Projection helpers (approximate)
   const getXY = (lat: number, lng: number) => {
@@ -65,29 +80,48 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
     });
   }, [data]);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale(prev => Math.min(Math.max(prev * delta, 0.5), 5));
-  };
+  const [lastPointerPos, setLastPointerPos] = useState({ x: 0, y: 0 });
+  const [hasMoved, setHasMoved] = useState(false);
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return; // Only left click
+    if (e.button !== 0) return;
     setIsDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
+    setHasMoved(false);
+    setLastPointerPos({ x: e.clientX, y: e.clientY });
+    if (containerRef.current) {
+      containerRef.current.setPointerCapture(e.pointerId);
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging) return;
+    
+    const dx = e.clientX - lastPointerPos.x;
+    const dy = e.clientY - lastPointerPos.y;
+    
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      setHasMoved(true);
+    }
+
     setPosition(prev => ({
-      x: prev.x + e.movementX,
-      y: prev.y + e.movementY
+      x: prev.x + dx,
+      y: prev.y + dy
     }));
+    setLastPointerPos({ x: e.clientX, y: e.clientY });
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
     setIsDragging(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    if (containerRef.current) {
+      containerRef.current.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const onBubbleClick = (e: React.MouseEvent, country: CountryData) => {
+    e.stopPropagation();
+    if (!hasMoved) {
+      onSelectCountry(country);
+    }
   };
 
   const resetView = () => {
@@ -97,9 +131,11 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
 
   return (
     <div 
-      className="relative w-full h-[400px] bg-slate-900/50 rounded-xl border border-slate-700 overflow-hidden group select-none touch-none"
+      className={cn(
+        "relative bg-[#0f172a] rounded-xl border border-slate-700 overflow-hidden group select-none touch-none transition-all duration-300",
+        isExpanded ? "fixed inset-4 z-[100] shadow-2xl" : "w-full h-[400px]"
+      )}
       ref={containerRef}
-      onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -116,42 +152,62 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
       </svg>
 
       {/* Overlay UI */}
-      <div className="absolute top-4 left-4 z-10 pointer-events-none">
-        <h3 className="text-slate-200 font-medium text-sm uppercase tracking-wider">Carte Mondiale des Flux</h3>
-        <p className="text-slate-400 text-xs mt-1">Taille = Volume | Couleur = Automatisation</p>
+      <div className="absolute top-4 left-4 z-10 pointer-events-none group-hover:opacity-100 transition-opacity">
+        <h3 className="text-slate-200 font-bold text-sm uppercase tracking-[0.2em]">Map Explorer</h3>
+        <p className="text-blue-500 text-[10px] font-black mt-1">SENSORS STATUS: ACTIVE</p>
       </div>
 
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         <button 
-          onClick={(e) => { e.stopPropagation(); setScale(prev => Math.min(prev * 1.2, 5)); }}
-          className="p-1.5 bg-slate-800/80 hover:bg-slate-700 rounded-md border border-slate-700 text-slate-300 transition-colors"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setScale(prev => Math.min(prev * 1.3, 8)); }}
+          className="p-2 bg-slate-800/90 hover:bg-blue-600 rounded-lg border border-slate-700 text-slate-300 transition-all hover:scale-110 active:scale-95"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-5 h-5" />
         </button>
         <button 
-          onClick={(e) => { e.stopPropagation(); setScale(prev => Math.max(prev / 1.2, 0.5)); }}
-          className="p-1.5 bg-slate-800/80 hover:bg-slate-700 rounded-md border border-slate-700 text-slate-300 transition-colors"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setScale(prev => Math.max(prev / 1.3, 0.4)); }}
+          className="p-2 bg-slate-800/90 hover:bg-blue-600 rounded-lg border border-slate-700 text-slate-300 transition-all hover:scale-110 active:scale-95"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-5 h-5" />
         </button>
         <button 
+          onPointerDown={e => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+          className={cn(
+            "p-2 rounded-lg border transition-all hover:scale-110 active:scale-95",
+            isExpanded ? "bg-red-600 text-white border-red-500" : "bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-blue-600"
+          )}
+        >
+          <Maximize className="w-5 h-5" />
+        </button>
+        <button 
+          onPointerDown={e => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); resetView(); }}
-          className="p-1.5 bg-slate-800/80 hover:bg-slate-700 rounded-md border border-slate-700 text-slate-300 transition-colors"
+          className="p-2 bg-slate-800/90 hover:bg-slate-700 rounded-lg border border-slate-700 text-slate-400 transition-all"
+          title="Reset View"
         >
-          <Maximize className="w-4 h-4" />
+          <RefreshCcw className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-        <MousePointer2 className="w-3 h-3" /> SCROLL POUR ZOOMER | GLISSER POUR NAVIGUER
+      <div className="absolute bottom-4 left-4 z-10 flex items-center gap-3 text-[9px] text-slate-500 font-black uppercase tracking-widest bg-slate-900/40 p-2 rounded-md backdrop-blur-sm border border-slate-800">
+        <div className="flex items-center gap-1.5"><MousePointer2 className="w-3 h-3 text-blue-500" /> Pan & Zoom Active</div>
+        <div className="w-px h-3 bg-slate-800" />
+        <div>Scale: {scale.toFixed(1)}x</div>
       </div>
       
       <svg 
         viewBox="0 0 800 400" 
-        style={{ width: '893px' }}
-        className="h-full"
+        style={{ width: isExpanded ? '100%' : '893px' }}
+        className="h-full w-full"
       >
-        <g style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, transformOrigin: 'center', transition: isDragging ? 'none' : 'transform 0.1s ease-out' }}>
+        <g style={{ 
+          transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`, 
+          transformOrigin: '0 0',
+          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)' 
+        }}>
           {/* Simple World Outline (Abstract) */}
           <path
             d="M150,100 Q200,80 250,110 T350,100 T500,120 T700,90 T750,200 T600,350 T400,380 T200,350 T100,250 Z"
@@ -168,10 +224,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({ data, onSelectCountry, selec
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               whileHover={{ scale: 1.1 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isDragging) onSelectCountry(b);
-              }}
+              onClick={(e) => onBubbleClick(e, b)}
               className="cursor-pointer"
             >
               <circle
