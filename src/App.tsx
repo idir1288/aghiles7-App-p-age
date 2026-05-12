@@ -294,7 +294,7 @@ function DashboardContent() {
                     "border rounded-2xl p-6 h-full flex flex-col transition-colors",
                     isDarkMode ? "bg-slate-900/50 border-slate-700" : "bg-white border-slate-200 shadow-lg"
                   )}
-                  style={{ height: '1500.33px' }}
+                  style={{ marginLeft: '0px', marginTop: '270px' }}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div>
@@ -424,7 +424,7 @@ function DashboardContent() {
                     "border border-dashed rounded-2xl p-8 h-full flex flex-col items-center justify-center text-center transition-colors",
                     isDarkMode ? "bg-slate-900/30 border-slate-700" : "bg-slate-50 border-slate-300"
                   )}
-                  style={{ height: '1500.33px' }}
+                  style={{ marginLeft: '0px', marginTop: '270px' }}
                 >
                   <div className={cn("w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors", isDarkMode ? "bg-slate-800" : "bg-white shadow-sm")}>
                     <Globe className={cn("w-8 h-8", isDarkMode ? "text-slate-600" : "text-slate-300")} />

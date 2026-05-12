@@ -34,7 +34,7 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
     return { label: 'À améliorer', color: isDarkMode ? 'text-amber-400' : 'text-amber-600' };
   };
 
-  const renderGauge = (title: string, value: number, refValue: number | undefined, icon: React.ReactNode) => {
+  const renderGauge = (title: string, value: number, refValue: number | undefined, icon: React.ReactNode, extraStyle?: React.CSSProperties) => {
     const status = getStatus(value);
     const circumference = 2 * Math.PI * 40;
     const offset = circumference - (value / 100) * circumference;
@@ -45,7 +45,7 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
           "flex flex-col items-center p-4 rounded-xl border transition-colors",
           isDarkMode ? "bg-slate-900/40 border-slate-700/50" : "bg-white border-slate-200"
         )}
-        style={{ width: '440.219px' }}
+        style={extraStyle}
       >
         <div className="relative w-24 h-24 mb-3">
           <svg className="w-full h-full -rotate-90">
@@ -93,9 +93,9 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-      {renderGauge("Automation", automation, refAutomation, <Zap className="w-3 h-3" />)}
-      {renderGauge("Précision", precision, refPrecision, <CheckCircle2 className="w-3 h-3" />)}
-      {renderGauge("Fluidité", fluidity, refFluidity, <Gauge className="w-3 h-3" />)}
+      {renderGauge("Automation", automation, refAutomation, <Zap className="w-3 h-3" />, { width: '405.219px', marginLeft: '49px' })}
+      {renderGauge("Précision", precision, refPrecision, <CheckCircle2 className="w-3 h-3" />, { marginLeft: '220px', marginRight: '22px', marginTop: '0px', width: '345.552px', marginBottom: '0px' })}
+      {renderGauge("Fluidité", fluidity, refFluidity, <Gauge className="w-3 h-3" />, { width: '334px', marginLeft: '333px', marginRight: '11px', marginTop: '0px' })}
     </div>
   );
 };
