@@ -38,7 +38,6 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
   const columns = [
     { key: 'name', label: 'Pays', icon: <Database className="w-3 h-3" /> },
     { key: 'precision', label: 'Taux Lecture', icon: <CheckCircle className="w-3 h-3" />, unit: '%' },
-    { key: 'automation', label: 'Automation', icon: <Zap className="w-3 h-3" />, unit: '%' },
     { key: 'iaLevel', label: 'Niveau IA', icon: <Cpu className="w-3 h-3" /> },
     { key: 'electronicAdoption', label: 'Adoption Élec.', icon: <TrendingUp className="w-3 h-3" />, unit: '%' },
     { key: 'revenue', label: 'Recettes/J', icon: <DollarSign className="w-3 h-3" />, unit: '$' },
@@ -59,7 +58,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
           "text-xs font-bold uppercase tracking-widest flex items-center gap-2",
           isDarkMode ? "text-slate-200" : "text-slate-800"
         )}>
-          Rapport de Performance Global
+          Données Opérationnelles Globales
         </h3>
       </div>
 
@@ -94,11 +93,6 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
                 <td className="px-6 py-4 font-mono">
                   <span className={cn(row.precision >= 95 ? "text-emerald-500" : "text-amber-500")}>
                     {row.precision.toFixed(2)}%
-                  </span>
-                </td>
-                <td className="px-6 py-4 font-mono">
-                  <span className={cn(row.automation >= 90 ? "text-emerald-500" : "text-sky-500")}>
-                    {row.automation.toFixed(0)}%
                   </span>
                 </td>
                 <td className="px-6 py-4">

@@ -10,32 +10,32 @@ import { useTheme } from '../lib/themeContext';
 import { cn } from '../lib/utils';
 
 interface KpiGaugesProps {
-  automation: number;
   precision: number; // Read Rate
   fluidity: number;
   revenue: number;
   errors: number;
+  techCount: number;
 }
 
 export const KpiGauges: React.FC<KpiGaugesProps> = ({ 
-  automation, 
   precision, 
   fluidity,
   revenue,
-  errors
+  errors,
+  techCount
 }) => {
   const { isDarkMode } = useTheme();
 
-  const getStatus = (val: number, type: 'precision' | 'automation' | 'errors' | 'fluidity') => {
+  const getStatus = (val: number, type: 'precision' | 'errors' | 'fluidity' | 'tech') => {
     if (type === 'precision') {
       if (val >= 98) return { label: 'Optimal', color: 'emerald' };
       if (val >= 95) return { label: 'Cible', color: 'sky' };
       return { label: 'Critique', color: 'red' };
     }
-    if (type === 'automation') {
-      if (val >= 95) return { label: 'Élevé', color: 'emerald' };
-      if (val >= 90) return { label: 'Cible', color: 'sky' };
-      return { label: 'Bas', color: 'amber' };
+    if (type === 'tech') {
+      if (val >= 4) return { label: 'Diversifié', color: 'emerald' };
+      if (val >= 2) return { label: 'Mixe', color: 'sky' };
+      return { label: 'Unique', color: 'slate' };
     }
     if (type === 'errors') {
       if (val <= 1) return { label: 'Minimal', color: 'emerald' };
@@ -87,11 +87,10 @@ export const KpiGauges: React.FC<KpiGaugesProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 w-full">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 w-full">
       {renderMetric("Taux Lecture", precision, "%", "precision", <CheckCircle2 />)}
-      {renderMetric("Automation", automation, "%", "automation", <Zap />)}
-      {renderMetric("Rev. Annuels", ((revenue * 365) / 1000000000).toFixed(2), "Md$", "revenue", <DollarSign />)}
-      {renderMetric("Recettes/j", (revenue / 1000000).toFixed(1), "M$", "revenue", <TrendingUp />)}
+      {renderMetric("Technologies", techCount, "Types", "tech", <Zap />)}
+      {renderMetric("Revenus/Jour", (revenue / 1000000).toFixed(2), "M$", "revenue", <DollarSign />)}
       {renderMetric("Erreurs", errors, "%", "errors", <AlertCircle />)}
       {renderMetric("Fluidité", fluidity, "s", "fluidity", <Clock />)}
     </div>
